@@ -1,3 +1,8 @@
+config-cameras.json
+
+.DS_store
+.idea/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
