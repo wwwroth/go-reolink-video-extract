@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type Cameras []Camera
@@ -32,9 +33,23 @@ type LoginPayloadUser struct {
 	Password string `json:"password"`
 }
 
-func (payload LoginRequest) getToken(camera Camera) string {
-	json, err := json.Marshal(payload)
-	requestJsonString := fmt.Sprint("[", string(json), "]")
+type LoginResponse struct {
+	Cmd   string `json:"cmd"`
+	Code  int    `json:"code"`
+	Value struct {
+		Token struct {
+			LeaseTime int    `json:"leaseTime"`
+			Name      string `json:"name"`
+		} `json:"Token"`
+	} `json:"value"`
+}
+
+func (payload LoginRequest) getToken(camera Camera) LoginResponse {
+
+	console(fmt.Sprintf("Camera on IP %s: fetching token", camera.IP))
+
+	jsonPayload, err := json.Marshal(payload)
+	requestJsonString := fmt.Sprint("[", string(jsonPayload), "]")
 
 	urlString := fmt.Sprint("http://", camera.IP, "/cgi-bin/api.cgi?cmd=Login")
 
@@ -54,7 +69,19 @@ func (payload LoginRequest) getToken(camera Camera) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return string(bodyText)
+
+	loginResponse := LoginResponse{}
+	json.Unmarshal(bodyText, &loginResponse)
+
+	console(fmt.Sprintf("Camera on IP %s: token fetched", camera.IP))
+
+	return loginResponse
+}
+
+func console(text string) bool {
+	t := time.Now().Format("2006-01-02 15:04:05")
+	fmt.Printf("%s | %s \n", t, text)
+	return true
 }
 
 func main() {
@@ -62,6 +89,8 @@ func main() {
 
 	cameras := Cameras{}
 	json.Unmarshal(file, &cameras)
+
+	console(fmt.Sprintf("Found %d cameras in configuration.", len(cameras)))
 
 	for i := 0; i < len(cameras); i++ {
 		camera := cameras[i]
@@ -76,8 +105,6 @@ func main() {
 			},
 		}
 
-		token := loginRequest.getToken(camera)
-
-		fmt.Println(token)
+		loginRequest.getToken(camera)
 	}
 }
