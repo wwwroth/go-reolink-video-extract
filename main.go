@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,7 +21,7 @@ type Camera struct {
 }
 
 type LoginRequest struct {
-	Cmd   string `json:"cmd"`
+	Cmd   string            `json:"cmd"`
 	Param LoginPayloadParam `json:"param"`
 }
 
@@ -33,7 +34,7 @@ type LoginPayloadUser struct {
 	Password string `json:"password"`
 }
 
-type LoginResponse struct {
+type LoginResponse []struct {
 	Cmd   string `json:"cmd"`
 	Code  int    `json:"code"`
 	Value struct {
@@ -44,9 +45,7 @@ type LoginResponse struct {
 	} `json:"value"`
 }
 
-func (payload LoginRequest) getToken(camera Camera) LoginResponse {
-
-	console(fmt.Sprintf("Camera on IP %s: fetching token", camera.IP))
+func (payload LoginRequest) getToken(camera Camera) (string, error) {
 
 	jsonPayload, err := json.Marshal(payload)
 	requestJsonString := fmt.Sprint("[", string(jsonPayload), "]")
@@ -73,9 +72,15 @@ func (payload LoginRequest) getToken(camera Camera) LoginResponse {
 	loginResponse := LoginResponse{}
 	json.Unmarshal(bodyText, &loginResponse)
 
-	console(fmt.Sprintf("Camera on IP %s: token fetched", camera.IP))
+	if loginResponse[0].Code > 0 {
+		console(fmt.Sprintf("Camera on IP %s: login failure", camera.IP))
+		return "", errors.New("failed to retrieve token")
+	}
 
-	return loginResponse
+	token := loginResponse[0].Value.Token.Name
+	console(fmt.Sprintf("Camera on IP %s: login success, token fetched, %s", camera.IP, token))
+
+	return token, nil
 }
 
 func console(text string) bool {
